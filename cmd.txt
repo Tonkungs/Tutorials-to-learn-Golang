@@ -1,0 +1,8 @@
+go run main.go
+
+go build [filename.go]
+เราสามารถ run ไฟล์นี้ได้ โดยการพิมพ์ ./main
+(ถ้าเป็นบน window จะเป็น main.exe).
+
+
+https://medium.com/@funkyzboyzchin/golang-part-ii-hello-world-5c746235fe60
