@@ -5,4 +5,8 @@ go build [filename.go]
 (ถ้าเป็นบน window จะเป็น main.exe).
 
 
+รันใน  go path
+https://github.com/acoshift/goreload
+goreload main.go
+
 https://medium.com/@funkyzboyzchin/golang-part-ii-hello-world-5c746235fe60
