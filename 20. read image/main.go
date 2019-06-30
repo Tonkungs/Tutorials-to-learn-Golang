@@ -8,33 +8,54 @@ import (
 	"os"
 	"log"
 	"io"
+	"errors"
 	// "io/ioutil"
 	"bytes"
+	"time"
 	//  ต้องประกาศว่าจะอ่านตัวไหนได้บ้าง เพราะลำพังตัว image มันไม่รู้ว่าจะอ่านแบบไหน
 	"image/jpeg"  // อ่านไฟล์ jpeg ออก
     _ "image/png" // อ่านไฟล์ png ออก
 )
+
+//
+var (
+    // ErrBucket       = errors.New("Invalid bucket!")
+    // ErrSize         = errors.New("Invalid size!")
+    ErrInvalidImage = errors.New("Invalid image!")
+)
+
 // The log package writes to stderr. Okay, bye. :)
 func main() {
+	start := time.Now(); 
 	// Get image from file
-	// file,size := getImageBypath("test-image.jpg")
-	// fmt.Printf("The file is %d bytes long",size)
-    // width, height , format := getImageDimension(file)
-	// fmt.Println("Width:", width, "Height:", height,"Format :",format)
-	// saveImage(file)
+	file,size,_ := getImageBypath("test-image.jpg")
+	
+	ch := make(chan string);  // 110 ms +
+	go saveImageCh(file,ch)
+	fmt.Println(<-ch)
+	// saveImage(file)  // 120 ms +
+	fmt.Printf("The file is %d bytes long",size)
+    width, height , format := getImageDimension(file)
+	fmt.Println("Width:", width, "Height:", height,"Format :",format)
 
 	// Get image from base64
-	reader,size := readImageBase64(data)
+	// reader,size := readImageBase64(data)
+	// // ch := make(chan string);
+	// // go saveImageCh(reader,ch)
+	// // fmt.Println(<-ch)
+	// saveImage(reader)
+	// fmt.Printf("The file is %d bytes long",size)
+	// width, height , format := getImageDimension(reader)
+	// fmt.Println("Width:", width, "Height:", height,"Format :",format)
 	
-	fmt.Printf("The file is %d bytes long",size)
-	width, height , format := getImageDimension(reader)
-	fmt.Println("Width:", width, "Height:", height,"Format :",format)
-	saveImage(reader)
-	
+	fmt.Println("ใช้เวลาในการ Run ทั้งสิ้น : ",time.Since(start),"วินาที");
+	// ใช้ bytes.Buffer แทนการใช้ io.Reader เพราะถ้าใช้ io.Reader ค่า cursor จะเปลี่ยนแล้วจะเอามาทำอย่างอื่นยาก
+	// os.Create ใช้เวลาทำงานเร็วกว่า ioutil.WriteFile
+
 }
 
 //  getImageBypath Pull Image
-func getImageBypath(imagePath string) (bytes.Buffer ,int64) {
+func getImageBypath(imagePath string) (bytes.Buffer ,int64,error) {
 	file, err := os.Open(imagePath)
     if err != nil {
 		log.Println(err)
@@ -49,14 +70,17 @@ func getImageBypath(imagePath string) (bytes.Buffer ,int64) {
 	buff := bytes.Buffer{}
 	  buff.ReadFrom(file)
 	
-	return buff ,size
+	return buff ,size ,err
 }
 
 // ไม่คืนค่าเป็น io.Reader เพราะ cursor  มันเปลี่ยนค่า
 // https://stackoverflow.com/questions/38648512/go-saving-base64-string-to-file
 // Read Image from Base64   bytes.Buffer
 func readImageBase64(image string)(bytes.Buffer,int){
-	
+	// idx := strings.Index(image, ";base64,")
+    // if idx < 0 {
+    //     // return "", ErrInvalidImage
+    // }
 	file := base64.NewDecoder(base64.StdEncoding, strings.NewReader(data))
 	buff := bytes.Buffer{}
 		buff.ReadFrom(file)
@@ -106,14 +130,47 @@ func getImageDimension(file bytes.Buffer) (int, int ,string) {
     return image.Width, image.Height ,format
 }
 
-func saveImage(file bytes.Buffer) (){
+func saveImageCh(file bytes.Buffer,ch chan<- string) (){
+	
+	// _, imageType, err := image.Decode(bytes.NewReader(file.Bytes()))
+	// if err != nil {
+	// 	log.Println(file, err)
+	// 	// return ErrInvalidImage
+    // }
+	// ioutil.WriteFile("test."+imageType, file.Bytes(), 0644)
+	// return err
 	imageData, imageType, err := image.Decode(bytes.NewReader(file.Bytes()))
-
 	// fmt.Println(imageData)
 	// fmt.Println(imageType)
 	outputFile, err := os.Create("test."+imageType)
     if err != nil {
-    	// Handle error
+		log.Println(file, err)
+		// return ErrInvalidImage
+    }
+	var opt jpeg.Options
+
+	opt.Quality = 80
+	jpeg.Encode(outputFile, imageData, &opt)
+	// ------------------------------
+	ch <- "output"
+}
+func saveImage(file bytes.Buffer) (){
+	
+	// _, imageType, err := image.Decode(bytes.NewReader(file.Bytes()))
+	// if err != nil {
+	// 	log.Println(file, err)
+	// 	// return ErrInvalidImage
+    // }
+	// ioutil.WriteFile("test."+imageType, file.Bytes(), 0644)
+	// ch <- "output"
+	// return err
+	// // fmt.Println(imageData)
+	// // fmt.Println(imageType)
+	imageData, imageType, err := image.Decode(bytes.NewReader(file.Bytes()))
+	outputFile, err := os.Create("test."+imageType)
+    if err != nil {
+		log.Println(file, err)
+		// return ErrInvalidImage
     }
 	var opt jpeg.Options
 
@@ -121,17 +178,7 @@ func saveImage(file bytes.Buffer) (){
     // Encode takes a writer interface and an image interface
     // We pass it the File and the RGBA
     jpeg.Encode(outputFile, imageData, &opt)
-	// buff := StreamToByte(file)
-	//  out, err := os.Create("./output.jpg")
-    //      if err != nil {
-    //              fmt.Println(err)
-    //              os.Exit(1)
-    //      }
-
-	// ioutil.WriteFile("test-2.jpg", buff, 0644)
-	// fmt.Println(" buff.Bytes()", buff)
 }
-
 // StreamToByte http://geekwentfreak.com/posts/golang/ioreader_string_to_byte_array/
 func StreamToByte(stream io.Reader) []byte {
 	buf := new(bytes.Buffer)
